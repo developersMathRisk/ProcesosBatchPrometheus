@@ -262,6 +262,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dias", type=int, default=1095, help="ventana histórica a cargar (por defecto 3 años)")
     ap.add_argument("--api", default="http://127.0.0.1:8080", help="URL base del backend")
     ap.add_argument("--carpeta-curvas", default="entrada_curvas", help="carpeta con los exports de curvas SBS (comando curvas)")
+    ap.add_argument("--curvas-desde", help="solo cargar tasas desde esta fecha (AAAA-MM-DD); evita cargar historia que el motor no usa")
     ap.add_argument("--dry-run", action="store_true", help="descarga y cuenta, sin escribir en el backend")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
@@ -276,7 +277,7 @@ def main(argv: list[str] | None = None) -> int:
         if a.comando in ("todo", "tc"):
             fallos += cmd_tc(api, desde, hasta, a.dry_run)
         if a.comando == "curvas":     # fuera de "todo": depende de archivos que se bajan a mano de la SBS
-            fallos += cmd_curvas(api, Path(a.carpeta_curvas), None, a.dry_run)
+            fallos += cmd_curvas(api, Path(a.carpeta_curvas), date.fromisoformat(a.curvas_desde) if a.curvas_desde else None, a.dry_run)
         if a.comando in ("todo", "portafolios"):
             fallos += cmd_portafolios(api, a.dry_run)
     except BackendError as exc:
