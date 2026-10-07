@@ -12,6 +12,9 @@ respeta el mapeo de entidades y no depende del nombre de las tablas.
 
 ## Uso
 
+El backend exige sesión: defina `API_USER` y `API_PASSWORD` (usuario con permisos de escritura en mantenedores, p. ej. rol
+*Analista de riesgos*, con su clave temporal ya cambiada) antes de ejecutar cualquier comando.
+
 ```bash
 pip install -r requirements-mercado.txt
 python -m carga_mercado.run todo --dry-run      # descarga y cuenta, no escribe
