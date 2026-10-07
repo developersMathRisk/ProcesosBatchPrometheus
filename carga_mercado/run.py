@@ -189,6 +189,24 @@ def _siguiente_codigo(existentes: list[dict]) -> str:
     return f"PORTAFOLIO{(max(numeros) if numeros else 0) + 1:04d}"
 
 
+def _actualizar_snapshot(api: Backend, ctx, pf: dict, actuales: list[dict], nuevas: list[dict], fecha_ref: date) -> None:
+    """Las posiciones son una foto por fecha (el dashboard consulta una fecha exacta). Si el portafolio ya
+    tiene la foto de `fecha_ref` no se toca; si no, se crea con las cantidades de su última foto y los
+    precios de `nuevas` (cierre de esa fecha; null en bonos)."""
+    ultima = max(p["fechaValor"] for p in actuales)
+    if ultima >= fecha_ref.isoformat():
+        log.info("%s: ya tiene la foto del %s, se deja como está", pf["descripcionPortafolio"], ultima)
+        return
+    precios = {p["codISIN"]: p["precio"] for p in nuevas}
+    cuerpo = [{"codISIN": p["codISIN"], "codticker": p["codticker"], "cantidad": p["cantidad"],
+               "precio": precios.get(p["codISIN"]), "fechaValor": fecha_ref.isoformat(),
+               "idPortafolio": pf["idPortafolio"], "idTipoInstrumento": p["idTipoInstrumento"]}
+              for p in actuales if p["fechaValor"] == ultima]
+    api.crear("crearPortafolioInstrumentoMasivo", cuerpo)
+    log.info("%s: nueva foto al %s con %d posiciones (cantidades de la foto del %s)",
+             pf["descripcionPortafolio"], fecha_ref, len(cuerpo), ultima)
+
+
 def cmd_portafolios(api: Backend, dry: bool) -> int:
     hoy = date.today()
     ultimo: dict[str, tuple[date, float]] = {}
@@ -229,7 +247,8 @@ def cmd_portafolios(api: Backend, dry: bool) -> int:
     ]
 
     existentes = api.listar("portafolio")
-    con_posiciones = {p["idPortafolio"] for p in api.listar("portafolioInstrumento")}
+    todas = api.listar("portafolioInstrumento")
+    con_posiciones = {p["idPortafolio"] for p in todas}
     for nombre, tipo_pf, moneda, nota, posiciones in definiciones:
         if not posiciones:
             log.error("%s: sin posiciones (¿faltan precios?)", nombre)
@@ -244,7 +263,8 @@ def cmd_portafolios(api: Backend, dry: bool) -> int:
                 "tipoPortafolio": tipo_pf, "idMoneda": moneda["idMoneda"]})
             existentes.append(pf)
         if pf["idPortafolio"] in con_posiciones:
-            log.info("%s: ya tiene posiciones, se deja como está", nombre)
+            _actualizar_snapshot(api, ctx, pf, [t for t in todas if t["idPortafolio"] == pf["idPortafolio"]],
+                                 posiciones, fecha_ref)
             continue
         cuerpo = [{"codISIN": p["codISIN"], "codticker": p["codticker"], "cantidad": p["cantidad"],
                    "precio": p["precio"], "fechaValor": p["fechaValor"], "idPortafolio": pf["idPortafolio"],

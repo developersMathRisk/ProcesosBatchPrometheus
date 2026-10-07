@@ -18,8 +18,20 @@ class Backend:
         self.s = requests.Session()
         self._iniciar_sesion()
 
+    @staticmethod
+    def _cargar_env() -> None:
+        """Lee API_USER/API_PASSWORD de un archivo .env (fuera de git) si no vienen ya del entorno."""
+        for ruta in (os.path.join(os.getcwd(), ".env"), os.path.join(os.path.dirname(__file__), "..", ".env")):
+            if os.path.exists(ruta):
+                for linea in open(ruta, encoding="utf-8"):
+                    k, _, v = linea.strip().partition("=")
+                    if k and v and k not in os.environ:
+                        os.environ[k] = v
+                return
+
     def _iniciar_sesion(self) -> None:
         """El backend exige JWT. Credenciales por variables de entorno API_USER / API_PASSWORD (nunca en el codigo)."""
+        self._cargar_env()
         usuario, clave = os.environ.get("API_USER"), os.environ.get("API_PASSWORD")
         if not usuario or not clave:
             raise BackendError("Defina las variables de entorno API_USER y API_PASSWORD (usuario con permiso de escritura "

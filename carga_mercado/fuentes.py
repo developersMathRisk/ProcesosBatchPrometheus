@@ -73,8 +73,8 @@ def tc_promedio_usd_pen(desde: date, hasta: date) -> list[tuple[date, float]]:
 def yahoo_cierres(simbolo: str, desde: date, hasta: date) -> tuple[dict, list[tuple[date, float]]]:
     """Cierres diarios (split-adjusted, sin ajustar por dividendos) de sesiones ya cerradas.
 
-    Devuelve (meta de Yahoo, [(fecha, cierre)]). Se descarta la barra del día en curso porque
-    mientras el mercado está abierto es un valor parcial.
+    Devuelve (meta de Yahoo, [(fecha, cierre)]). Se descarta la barra del día en curso solo mientras el
+    mercado sigue abierto (valor parcial); una vez terminada la sesión regular, esa barra ya es el cierre.
     """
     params = {
         "period1": int(datetime.combine(desde, hora.min, tzinfo=timezone.utc).timestamp()),
@@ -90,13 +90,15 @@ def yahoo_cierres(simbolo: str, desde: date, hasta: date) -> tuple[dict, list[tu
     meta = res["meta"]
     offset = timedelta(seconds=meta.get("gmtoffset", 0))
     hoy_mercado = (datetime.now(timezone.utc) + offset).date()
+    fin_sesion = (meta.get("currentTradingPeriod") or {}).get("regular", {}).get("end")
+    sesion_cerrada = fin_sesion is not None and datetime.now(timezone.utc).timestamp() >= fin_sesion
     cierres = res["indicators"]["quote"][0]["close"]
     salida = []
     for ts, c in zip(res.get("timestamp", []), cierres):
         if c is None:
             continue
         f = (datetime.fromtimestamp(ts, timezone.utc) + offset).date()
-        if f >= hoy_mercado:
+        if f > hoy_mercado or (f == hoy_mercado and not sesion_cerrada):
             continue
         salida.append((f, round(float(c), 4)))
     return meta, salida
