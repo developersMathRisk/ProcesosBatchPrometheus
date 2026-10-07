@@ -13,10 +13,12 @@ import argparse
 import logging
 import re
 import sys
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
 from . import fuentes
+from .curvas import cmd_curvas
 from .backend import Backend, BackendError
 from .instrumentos import ACCIONES, BONOS_CANTIDAD, FONDOS
 from .isin import isin_valido
@@ -256,9 +258,10 @@ def cmd_portafolios(api: Backend, dry: bool) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("comando", choices=["todo", "instrumentos", "tc", "portafolios"])
+    ap.add_argument("comando", choices=["todo", "instrumentos", "tc", "portafolios", "curvas"])
     ap.add_argument("--dias", type=int, default=1095, help="ventana histórica a cargar (por defecto 3 años)")
     ap.add_argument("--api", default="http://127.0.0.1:8080", help="URL base del backend")
+    ap.add_argument("--carpeta-curvas", default="entrada_curvas", help="carpeta con los exports de curvas SBS (comando curvas)")
     ap.add_argument("--dry-run", action="store_true", help="descarga y cuenta, sin escribir en el backend")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
@@ -272,6 +275,8 @@ def main(argv: list[str] | None = None) -> int:
             fallos += cmd_instrumentos(api, desde, hasta, a.dry_run)
         if a.comando in ("todo", "tc"):
             fallos += cmd_tc(api, desde, hasta, a.dry_run)
+        if a.comando == "curvas":     # fuera de "todo": depende de archivos que se bajan a mano de la SBS
+            fallos += cmd_curvas(api, Path(a.carpeta_curvas), None, a.dry_run)
         if a.comando in ("todo", "portafolios"):
             fallos += cmd_portafolios(api, a.dry_run)
     except BackendError as exc:

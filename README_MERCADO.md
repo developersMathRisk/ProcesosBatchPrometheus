@@ -7,6 +7,7 @@ respeta el mapeo de entidades y no depende del nombre de las tablas.
 |---|---|---|
 | Tipo de cambio `USDPEN Currency` | BCRP, series `PD04639PD` (compra) y `PD04640PD` (venta) del *TC Sistema bancario SBS*; se guarda el **promedio simple**, como en `carga_bd_riesgos.py` | `tipoCambio` |
 | Cierres diarios de acciones y fondos (ETF) | Yahoo Finance (API no oficial) | `vectorPrecio` + catálogo (`accion`, `fondo`, emisor, plaza, sector) |
+| Curvas SBS (CCPSS, CCPEDS, CBCRS, …) | **Archivos** que se dejan en `entrada_curvas/` (export Excel/CSV del portal SBS o parquet del motor anterior) | `curvaReferenciaPuntos` + `curvaReferenciaValores` |
 | Portafolios de Acciones, Fondos y Bonos | catálogo + último cierre | `portafolio` + `portafolioInstrumento` |
 
 ## Uso
@@ -17,7 +18,9 @@ python -m carga_mercado.run todo --dry-run      # descarga y cuenta, no escribe
 python -m carga_mercado.run todo                # carga completa (3 años por defecto)
 python -m carga_mercado.run tc --dias 10        # solo TC, últimos 10 días (corrida diaria)
 python -m carga_mercado.run instrumentos --dias 10
-python -m unittest carga_mercado.tests.test_parsers
+python -m carga_mercado.run curvas --dry-run     # lee entrada_curvas/ y cuenta, no escribe
+python -m carga_mercado.run curvas               # carga y mueve los archivos a procesados/ o con_error/
+python -m unittest discover -s carga_mercado/tests -t .
 ```
 
 Es **idempotente**: cada corrida agrega solo lo que falta (clave fecha + ISIN, o fecha + ticker).
@@ -41,5 +44,12 @@ Programarla (cron, después del cierre de NY, ~18:00 hora Lima):
 - **Bonos**: sin precio. El vector de precios SBS no tiene API pública y el motor de VaR excluye bonos.
 - **Yahoo no es una fuente regulada**: sirve para desarrollo y demo; para producción conviene un
   proveedor con contrato y SLA.
-- **No cubre aún**: curvas soberanas SBS (descarga manual, ver `carga_bd_riesgos.py`), superficie de
-  volatilidad, índices de mercado, completar el TC del día *t* desde la SBS.
+- **Curvas SBS**: el portal está detrás de un WAF (Imperva) que pide un navegador real; no se automatiza
+  ni se intenta saltar. Flujo: descargar el export de *Curva Soberana > Consulta histórica*, dejarlo en
+  `entrada_curvas/` y correr `curvas` (idempotente: clave punto + fecha). El código de la curva sale de la
+  columna "Tipo de Curva" o del nombre del archivo (`CCPSS_2025.xlsx`). `curvas` no entra en `todo`.
+  Los scripts de `PrometheusModelos` (`curvas_to_postgres.py`, `curvas_service.obtener_curva`) no
+  funcionan como están: el scraper usa un endpoint/parámetros que no existen y el espejo de GitHub
+  llega solo hasta 2025-12-26. El SQL de `carga_bd_riesgos.py` apunta a tablas `fd_curvareferencia*`
+  que no son las del backend (`t027_*`, `t028_*`): usar este comando.
+- **No cubre aún**: superficie de volatilidad, índices de mercado, completar el TC del día *t* desde la SBS.
