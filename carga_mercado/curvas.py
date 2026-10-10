@@ -35,6 +35,10 @@ CURVAS = {
     "CBCRS": "Curva Banco Central de Reserva CDBCRP",
     "CSBCRD": "Curva Cupón Cero Dólares Sintética",
     "CCSDF": "Curva Dólares Corto Plazo",
+    "CBCRPS": "Curva Banco Central de Reserva CDBCRP NR",
+    # No son curvas SBS: rendimiento diario del bono soberano a 10 años publicado por el BCRP (comando bcrp)
+    "BCRP10S": "BCRP - Rendimiento bono soberano 10 años (S/)",
+    "BCRP10D": "BCRP - Rendimiento bono soberano 10 años (US$)",
 }
 HILOS = 6
 

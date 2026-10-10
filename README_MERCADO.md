@@ -7,6 +7,7 @@ respeta el mapeo de entidades y no depende del nombre de las tablas.
 |---|---|---|
 | Tipo de cambio `USDPEN Currency` | BCRP, series `PD04639PD` (compra) y `PD04640PD` (venta) del *TC Sistema bancario SBS*; se guarda el **promedio simple**, como en `carga_bd_riesgos.py` | `tipoCambio` |
 | Cierres diarios de acciones y fondos (ETF) | Yahoo Finance (API no oficial) | `vectorPrecio` + catálogo (`accion`, `fondo`, emisor, plaza, sector) |
+| Rendimiento diario del bono soberano a 10 años | BCRP, series `PD31893DD` (S/) y `PD31894DD` (US$); el BCRP no publica otros plazos a diario | `curvaReferenciaValores` como curvas `BCRP10S` / `BCRP10D` (vértice 3600 días) |
 | Curvas SBS (CCPSS, CCPEDS, CBCRS, …) | **Archivos** que se dejan en `entrada_curvas/` (export Excel/CSV del portal SBS o parquet del motor anterior) | `curvaReferenciaPuntos` + `curvaReferenciaValores` |
 | Portafolios de Acciones, Fondos y Bonos | catálogo + último cierre | `portafolio` + `portafolioInstrumento` |
 
@@ -20,6 +21,7 @@ pip install -r requirements-mercado.txt
 python -m carga_mercado.run todo --dry-run      # descarga y cuenta, no escribe
 python -m carga_mercado.run todo                # carga completa (3 años por defecto)
 python -m carga_mercado.run tc --dias 10        # solo TC, últimos 10 días (corrida diaria)
+python -m carga_mercado.run bcrp --dias 10      # bono soberano 10 años S/ y US$ (BCRP)
 python -m carga_mercado.run instrumentos --dias 10
 python -m carga_mercado.run curvas --dry-run     # lee entrada_curvas/ y cuenta, no escribe
 python -m carga_mercado.run curvas               # carga y mueve los archivos a procesados/ o con_error/
@@ -48,7 +50,9 @@ Programarla (cron, después del cierre de NY, ~18:00 hora Lima):
 - **Yahoo no es una fuente regulada**: sirve para desarrollo y demo; para producción conviene un
   proveedor con contrato y SLA.
 - **Curvas SBS**: el portal está detrás de un WAF (Imperva) que pide un navegador real; no se automatiza
-  ni se intenta saltar. Flujo: descargar el export de *Curva Soberana > Consulta histórica*, dejarlo en
+  ni se intenta saltar (tampoco funciona `sbs_loader.py`: recibe el desafío de Incapsula). Carga semiautomática
+  desde la web: *Mantenedores > Factores de Riesgo > Tasas de interés > Curvas SBS* abre la consulta, el
+  usuario exporta y arrastra el Excel; el backend reemplaza las tasas de esas fechas. Alternativa por lotes: Flujo: descargar el export de *Curva Soberana > Consulta histórica*, dejarlo en
   `entrada_curvas/` y correr `curvas` (idempotente: clave punto + fecha). El código de la curva sale de la
   columna "Tipo de Curva" o del nombre del archivo (`CCPSS_2025.xlsx`). `curvas` no entra en `todo`.
   Los scripts de `PrometheusModelos` (`curvas_to_postgres.py`, `curvas_service.obtener_curva`) no

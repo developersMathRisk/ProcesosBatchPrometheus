@@ -4,6 +4,7 @@
     python -m carga_mercado.run instrumentos  # catálogo + precios de acciones y fondos (Yahoo Finance)
     python -m carga_mercado.run tc            # tipo de cambio USDPEN (BCRP, promedio SBS compra/venta)
     python -m carga_mercado.run portafolios   # portafolios de Acciones, Fondos y Bonos
+    python -m carga_mercado.run bcrp          # rendimiento diario del bono soberano a 10 años (BCRP, S/ y US$)
 
 Es idempotente: cada corrida solo agrega lo que falta (clave: fecha + instrumento / fecha + ticker).
 """
@@ -18,7 +19,9 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
 from . import fuentes
-from .curvas import cmd_curvas
+import pandas as pd
+
+from .curvas import cargar_df, cmd_curvas
 from .backend import Backend, BackendError
 from .instrumentos import ACCIONES, BONOS_CANTIDAD, FONDOS
 from .isin import isin_valido
@@ -180,6 +183,32 @@ def cmd_tc(api: Backend, desde: date, hasta: date, dry: bool) -> int:
 
 
 # ---------------------------------------------------------------------------------------------
+# Tasas BCRP (bono soberano 10 años) -> curvas BCRP10S / BCRP10D, vértice de 3600 días
+# ---------------------------------------------------------------------------------------------
+
+SERIES_BCRP = {"BCRP10S": fuentes.BCRP_BONO10_PEN, "BCRP10D": fuentes.BCRP_BONO10_USD}
+PLAZO_BONO10 = 3600
+
+
+def cmd_bcrp(api: Backend, desde: date, hasta: date, dry: bool) -> int:
+    fallos = 0
+    for curva, codigo in SERIES_BCRP.items():
+        try:
+            serie = fuentes.bcrp_serie_diaria(codigo, desde, hasta)
+        except fuentes.FuenteError as exc:
+            log.error("%s (%s): %s", curva, codigo, exc)
+            fallos += 1
+            continue
+        if not serie:
+            log.warning("%s (%s): el BCRP no devolvió datos en la ventana", curva, codigo)
+            continue
+        df = pd.DataFrame({"fecha": [f for f, _ in serie], "plazo": PLAZO_BONO10,
+                           "tasa": [v for _, v in serie], "curva": curva})
+        cargar_df(api, df, dry)
+    return fallos
+
+
+# ---------------------------------------------------------------------------------------------
 # Portafolios
 # ---------------------------------------------------------------------------------------------
 
@@ -278,7 +307,7 @@ def cmd_portafolios(api: Backend, dry: bool) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("comando", choices=["todo", "instrumentos", "tc", "portafolios", "curvas"])
+    ap.add_argument("comando", choices=["todo", "instrumentos", "tc", "bcrp", "portafolios", "curvas"])
     ap.add_argument("--dias", type=int, default=1095, help="ventana histórica a cargar (por defecto 3 años)")
     ap.add_argument("--api", default="http://127.0.0.1:8080", help="URL base del backend")
     ap.add_argument("--carpeta-curvas", default="entrada_curvas", help="carpeta con los exports de curvas SBS (comando curvas)")
@@ -296,6 +325,8 @@ def main(argv: list[str] | None = None) -> int:
             fallos += cmd_instrumentos(api, desde, hasta, a.dry_run)
         if a.comando in ("todo", "tc"):
             fallos += cmd_tc(api, desde, hasta, a.dry_run)
+        if a.comando in ("todo", "bcrp"):
+            fallos += cmd_bcrp(api, desde, hasta, a.dry_run)
         if a.comando == "curvas":     # fuera de "todo": depende de archivos que se bajan a mano de la SBS
             fallos += cmd_curvas(api, Path(a.carpeta_curvas), date.fromisoformat(a.curvas_desde) if a.curvas_desde else None, a.dry_run)
         if a.comando in ("todo", "portafolios"):

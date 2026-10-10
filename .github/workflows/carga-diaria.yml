@@ -30,5 +30,6 @@ jobs:
           done
           exit 1
       - run: python -m carga_mercado.run tc --dias 10 --api "${{ secrets.API_URL }}"
+      - run: python -m carga_mercado.run bcrp --dias 10 --api "${{ secrets.API_URL }}"
       - run: python -m carga_mercado.run instrumentos --dias 10 --api "${{ secrets.API_URL }}"
       - run: python -m carga_mercado.run portafolios --api "${{ secrets.API_URL }}"

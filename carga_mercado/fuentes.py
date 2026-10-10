@@ -70,6 +70,26 @@ def tc_promedio_usd_pen(desde: date, hasta: date) -> list[tuple[date, float]]:
     return salida
 
 
+# Rendimiento diario del bono soberano a 10 años (el BCRP no publica otros plazos en frecuencia diaria)
+BCRP_BONO10_PEN = "PD31893DD"
+BCRP_BONO10_USD = "PD31894DD"
+
+
+def bcrp_serie_diaria(codigo: str, desde: date, hasta: date) -> list[tuple[date, float]]:
+    """Serie diaria del BCRP [(fecha, valor)], sin los días 'n.d.' (se completan en la corrida siguiente)."""
+    r = _get(f"{BCRP_URL}/{codigo}/json/{desde:%Y-%m-%d}/{hasta:%Y-%m-%d}")
+    try:
+        datos = r.json()
+    except ValueError as exc:
+        raise FuenteError(f"BCRP no devolvió JSON para {codigo}: {r.text[:120]}") from exc
+    salida = []
+    for p in datos.get("periods", []):
+        v = _numero(p["values"][0])
+        if v is not None:
+            salida.append((fecha_bcrp(p["name"]), v))
+    return salida
+
+
 def yahoo_cierres(simbolo: str, desde: date, hasta: date) -> tuple[dict, list[tuple[date, float]]]:
     """Cierres diarios (split-adjusted, sin ajustar por dividendos) de sesiones ya cerradas.
 
