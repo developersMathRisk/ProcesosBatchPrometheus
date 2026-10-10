@@ -34,5 +34,7 @@ jobs:
       # Curvas SBS: las descarga el backend; si el portal las bloquea ese día, no detiene el resto de la carga
       - run: python -m carga_mercado.run curvas-sbs --api "${{ secrets.API_URL }}"
         continue-on-error: true
+      - run: python -m carga_mercado.run vector-sbs --api "${{ secrets.API_URL }}"
+        continue-on-error: true
       - run: python -m carga_mercado.run instrumentos --dias 10 --api "${{ secrets.API_URL }}"
       - run: python -m carga_mercado.run portafolios --api "${{ secrets.API_URL }}"

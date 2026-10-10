@@ -6,6 +6,7 @@
     python -m carga_mercado.run portafolios   # portafolios de Acciones, Fondos y Bonos
     python -m carga_mercado.run bcrp          # rendimiento diario del bono soberano a 10 años (BCRP, S/ y US$)
     python -m carga_mercado.run curvas-sbs    # pide al backend que descargue las curvas del portal SBS
+    python -m carga_mercado.run vector-sbs    # pide al backend que descargue el vector de precios SBS (renta fija)
 
 Es idempotente: cada corrida solo agrega lo que falta (clave: fecha + instrumento / fecha + ticker).
 """
@@ -228,6 +229,21 @@ def cmd_curvas_sbs(api: Backend, dry: bool) -> int:
     return fallos
 
 
+def cmd_vector_sbs(api: Backend, dry: bool) -> int:
+    if dry:
+        log.info("vector-sbs: en dry-run no se pide la descarga al backend")
+        return 0
+    fallos = 0
+    for r in api.crear("vector-precios/actualizar-sbs", {}, timeout=900):
+        if r.get("error") and r.get("instrumentos") is None:
+            fallos += 1
+            log.error("vector %s %s: %s", r["fecha"], r["moneda"], r["error"])
+        else:
+            log.info("vector %s %s: %s instrumentos%s", r["fecha"], r["moneda"], r["instrumentos"],
+                     f" ({r['error']})" if r.get("error") else "")
+    return fallos
+
+
 # ---------------------------------------------------------------------------------------------
 # Portafolios
 # ---------------------------------------------------------------------------------------------
@@ -327,7 +343,7 @@ def cmd_portafolios(api: Backend, dry: bool) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("comando", choices=["todo", "instrumentos", "tc", "bcrp", "curvas-sbs", "portafolios", "curvas"])
+    ap.add_argument("comando", choices=["todo", "instrumentos", "tc", "bcrp", "curvas-sbs", "vector-sbs", "portafolios", "curvas"])
     ap.add_argument("--dias", type=int, default=1095, help="ventana histórica a cargar (por defecto 3 años)")
     ap.add_argument("--api", default="http://127.0.0.1:8080", help="URL base del backend")
     ap.add_argument("--carpeta-curvas", default="entrada_curvas", help="carpeta con los exports de curvas SBS (comando curvas)")
@@ -349,6 +365,8 @@ def main(argv: list[str] | None = None) -> int:
             fallos += cmd_bcrp(api, desde, hasta, a.dry_run)
         if a.comando in ("todo", "curvas-sbs"):
             fallos += cmd_curvas_sbs(api, a.dry_run)
+        if a.comando in ("todo", "vector-sbs"):
+            fallos += cmd_vector_sbs(api, a.dry_run)
         if a.comando == "curvas":     # fuera de "todo": depende de archivos que se bajan a mano de la SBS
             fallos += cmd_curvas(api, Path(a.carpeta_curvas), date.fromisoformat(a.curvas_desde) if a.curvas_desde else None, a.dry_run)
         if a.comando in ("todo", "portafolios"):

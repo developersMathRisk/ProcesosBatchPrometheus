@@ -8,6 +8,7 @@ respeta el mapeo de entidades y no depende del nombre de las tablas.
 | Tipo de cambio `USDPEN Currency` | BCRP, series `PD04639PD` (compra) y `PD04640PD` (venta) del *TC Sistema bancario SBS*; se guarda el **promedio simple**, como en `carga_bd_riesgos.py` | `tipoCambio` |
 | Cierres diarios de acciones y fondos (ETF) | Yahoo Finance (API no oficial) | `vectorPrecio` + catálogo (`accion`, `fondo`, emisor, plaza, sector) |
 | Rendimiento diario del bono soberano a 10 años | BCRP, series `PD31893DD` (S/) y `PD31894DD` (US$); el BCRP no publica otros plazos a diario | `curvaReferenciaValores` como curvas `BCRP10S` / `BCRP10D` (vértice 3600 días) |
+| Vector de precios de renta fija | SBS, `ExportarListadoVectorPrecios` (POST {FechaProceso, TipoMoneda 1=PEN, 2=USD}); lo descarga el backend | `vectorPrecio` con fuente `SBS` (precio limpio/sucio en %, TIR, duración, cupón, vencimiento), una fecha se reemplaza completa |
 | Curvas SBS (CCPSS, CCPEDS, CBCRS, …) | **Archivos** que se dejan en `entrada_curvas/` (export Excel/CSV del portal SBS o parquet del motor anterior) | `curvaReferenciaPuntos` + `curvaReferenciaValores` |
 | Portafolios de Acciones, Fondos y Bonos | catálogo + último cierre | `portafolio` + `portafolioInstrumento` |
 
@@ -23,6 +24,7 @@ python -m carga_mercado.run todo                # carga completa (3 años por de
 python -m carga_mercado.run tc --dias 10        # solo TC, últimos 10 días (corrida diaria)
 python -m carga_mercado.run bcrp --dias 10      # bono soberano 10 años S/ y US$ (BCRP)
 python -m carga_mercado.run curvas-sbs          # el backend descarga las curvas del portal SBS (últimos 60 días)
+python -m carga_mercado.run vector-sbs          # el backend descarga el vector de precios SBS (días hábiles que falten)
 python -m carga_mercado.run instrumentos --dias 10
 python -m carga_mercado.run curvas --dry-run     # lee entrada_curvas/ y cuenta, no escribe
 python -m carga_mercado.run curvas               # carga y mueve los archivos a procesados/ o con_error/
