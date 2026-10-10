@@ -31,5 +31,8 @@ jobs:
           exit 1
       - run: python -m carga_mercado.run tc --dias 10 --api "${{ secrets.API_URL }}"
       - run: python -m carga_mercado.run bcrp --dias 10 --api "${{ secrets.API_URL }}"
+      # Curvas SBS: las descarga el backend; si el portal las bloquea ese día, no detiene el resto de la carga
+      - run: python -m carga_mercado.run curvas-sbs --api "${{ secrets.API_URL }}"
+        continue-on-error: true
       - run: python -m carga_mercado.run instrumentos --dias 10 --api "${{ secrets.API_URL }}"
       - run: python -m carga_mercado.run portafolios --api "${{ secrets.API_URL }}"

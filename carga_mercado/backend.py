@@ -50,8 +50,8 @@ class Backend:
             raise BackendError(f"GET {ruta}/list -> {r.status_code}: {r.text[:200]}")
         return r.json()
 
-    def crear(self, ruta: str, cuerpo) -> dict | list:
-        r = self.s.post(f"{self.base}/{ruta}", json=cuerpo, timeout=120)
+    def crear(self, ruta: str, cuerpo, timeout: int = 120) -> dict | list:
+        r = self.s.post(f"{self.base}/{ruta}", json=cuerpo, timeout=timeout)
         if not r.ok:
             raise BackendError(f"POST {ruta} -> {r.status_code}: {r.text[:300]}")
         return r.json()

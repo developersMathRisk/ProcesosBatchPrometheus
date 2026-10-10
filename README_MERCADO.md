@@ -22,6 +22,7 @@ python -m carga_mercado.run todo --dry-run      # descarga y cuenta, no escribe
 python -m carga_mercado.run todo                # carga completa (3 años por defecto)
 python -m carga_mercado.run tc --dias 10        # solo TC, últimos 10 días (corrida diaria)
 python -m carga_mercado.run bcrp --dias 10      # bono soberano 10 años S/ y US$ (BCRP)
+python -m carga_mercado.run curvas-sbs          # el backend descarga las curvas del portal SBS (últimos 60 días)
 python -m carga_mercado.run instrumentos --dias 10
 python -m carga_mercado.run curvas --dry-run     # lee entrada_curvas/ y cuenta, no escribe
 python -m carga_mercado.run curvas               # carga y mueve los archivos a procesados/ o con_error/
@@ -49,14 +50,12 @@ Programarla (cron, después del cierre de NY, ~18:00 hora Lima):
 - **Bonos**: sin precio. El vector de precios SBS no tiene API pública y el motor de VaR excluye bonos.
 - **Yahoo no es una fuente regulada**: sirve para desarrollo y demo; para producción conviene un
   proveedor con contrato y SLA.
-- **Curvas SBS**: el portal está detrás de un WAF (Imperva) que pide un navegador real; no se automatiza
-  ni se intenta saltar (tampoco funciona `sbs_loader.py`: recibe el desafío de Incapsula). Carga semiautomática
-  desde la web: *Mantenedores > Factores de Riesgo > Tasas de interés > Curvas SBS* abre la consulta, el
-  usuario exporta y arrastra el Excel; el backend reemplaza las tasas de esas fechas. Alternativa por lotes: Flujo: descargar el export de *Curva Soberana > Consulta histórica*, dejarlo en
-  `entrada_curvas/` y correr `curvas` (idempotente: clave punto + fecha). El código de la curva sale de la
-  columna "Tipo de Curva" o del nombre del archivo (`CCPSS_2025.xlsx`). `curvas` no entra en `todo`.
-  Los scripts de `PrometheusModelos` (`curvas_to_postgres.py`, `curvas_service.obtener_curva`) no
-  funcionan como están: el scraper usa un endpoint/parámetros que no existen y el espejo de GitHub
-  llega solo hasta 2025-12-26. El SQL de `carga_bd_riesgos.py` apunta a tablas `fd_curvareferencia*`
-  que no son las del backend (`t027_*`, `t028_*`): usar este comando.
+- **Curvas SBS**: se descargan del endpoint de exportación del portal
+  (`/app/pp/n_CurvaSoberana/ExportarListadoHistoricoCurvaSoberana`, POST {TipoCurva, FechaInicio, FechaFin}), el mismo
+  que usa el botón "Exportar". Lo hace el backend (`POST /mantenedores/curvas/actualizar-sbs`): cada curva de
+  `app.sbs.curvas` se vuelve a pedir en los últimos 60 días y se reemplazan las tasas. Lo disparan la carga diaria
+  (`curvas-sbs`) y el botón *Actualizar desde SBS* (Factores de Riesgo > Tasas de interés). La página de consulta está
+  detrás de un WAF (Imperva): si el portal pide verificación de navegador, la corrida se detiene sin reintentar y se
+  vuelve a intentar al día siguiente; nunca se intenta saltar ese control. Los pedidos van espaciados (8 s).
+  El comando `curvas` (archivos en `entrada_curvas/`) queda para cargas históricas puntuales.
 - **No cubre aún**: superficie de volatilidad, índices de mercado, completar el TC del día *t* desde la SBS.
